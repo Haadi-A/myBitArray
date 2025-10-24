@@ -32,6 +32,8 @@ print("Any is Nar: ", any(l))
 
 
 
+
+
             # # resize the bytearray and recall the appendBit.
             # print(f'last byte {self.__byteRpr[-1]}, {self.__lastIndxContainingByte()}')
             # if self.__byteRpr[lastIndxContainingByte] < 255:
