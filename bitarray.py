@@ -1,11 +1,12 @@
 from math import ceil
 from typing import Iterable
-
+IS_DEBUG_MODE = True
 
 class BitArray(list[bool]):
-    def __init__(self, ):
+    def __init__(self, strRpr:str= ''):
+        self.__byteArray = bytearray(1) if strRpr == '' else self.__initByteArray(strRpr)
+
         # Create a byte array with bytes less
-        self.__byteArray = bytearray(1)
         self.__unsetTailBitsLen: int = 0
         '''Used to represent the number of off-bits appended to the end of the byte array but not yet reflected in the byte array.'''
         
@@ -13,9 +14,35 @@ class BitArray(list[bool]):
         '''Used to represent the number of bits, be it on or off bits which are not unset tail bits: **[__unsetTailBits]**'''
 
 
+    def __initByteArray(self, strRpr: str)-> bytearray:
+
+        # strRprLen = len(strRpr)
+        intervaledStr = self.intervaledCharInserter(strRpr)
+        # print(f'__initByteArray(): Delineated str: ', intervaledStr)
+        splittedStrRpr = intervaledStr.split('|')
+        if splittedStrRpr[-1] == '': splittedStrRpr.pop()
+        # print(f'__initByteArray(): SplittedString: ', splittedStrRpr, 'elements len: ', len(''.join(splittedStrRpr)))
+
+        # print(f'__initByteArray(): BA:               [', end='')
+        print(f"splitted string chars len: {len(splittedStrRpr)} {splittedStrRpr}")
+        bytesItrbl = [int(byte, 2) for byte in splittedStrRpr]
+        
+        ba = bytearray(bytesItrbl)
+        return ba 
+           
+
+    @property
+    def repBits(self)-> int: return self.__representedBits
+    
+    @property
+    def unsetBits(self)-> int: return self.__unsetTailBitsLen
+
     def __len__(self) -> int:
         '''Returns the bit length of the bytearray'''
-        return self.__unsetTailBitsLen + self.__representedBits
+        lSByteIndx = self.__getLastSetByteIndx()
+        lSByteBitsNo = self._getByteLastSetBitIndx(self.__byteArray[lSByteIndx]) + 1
+        return lSByteIndx * 8  + \
+                lSByteBitsNo + self.__unsetTailBitsLen 
 
     def __repr__(self) -> str:
         """
@@ -28,8 +55,8 @@ class BitArray(list[bool]):
         Returns:
             str: The concatenated 8-bit binary string representing the byte array.
 
-        Notes:
-            - Expects each element of self.__byteArray to be an integer in the range 0–255.
+        Notes: 
+            - Expects each element of self.__byteArray to be an integer in the range 0-255.
             - Primarily intended for a human-readable or debugging representation of the bytes.
         """
         return ''.join(format(byte, '08b') for byte in self.__byteArray)
@@ -44,6 +71,40 @@ class BitArray(list[bool]):
     @property
     def byteRpr(self) -> bytearray:
         return self.__byteArray
+    
+
+    @staticmethod
+    def intervaledCharInserter(undelinieatedStr: str, sep: str = '|', interval: int = 8)-> str:
+        # itrbl = list(itrbl)
+        # Ignore input if char len < 9
+        if len(undelinieatedStr) < 9: return undelinieatedStr + sep 
+        iPrv, iNxt = 0, interval
+        editedItrbl:list[str] = []
+        itrblLen = len(undelinieatedStr)
+        # print("intervaled char inserter: here is the itrbl: ", undelinieatedStr, ' itrbl len: ', itrblLen)
+        if itrblLen <= interval: return undelinieatedStr
+        
+        while True:
+            # print(f'iPrv: {iPrv}, iNxt: {iNxt}')
+            if iNxt > itrblLen:
+                if iPrv < itrblLen:
+                #    print("$$$$: Curr slice's: ", undelinieatedStr[iPrv:])
+                   editedItrbl.append(''.join(undelinieatedStr[iPrv:]))
+                # print("G-", editedItrbl)
+                return ''.join(editedItrbl)
+
+            # print("Curr slice's: ", undelinieatedStr[iPrv:iNxt])
+            nStr = ''.join(undelinieatedStr[iPrv:iNxt]) + sep
+            editedItrbl.append(nStr)
+            iPrv = iNxt 
+            iNxt += 8
+
+        # print("here is the editedItrbl: ", editedItrbl)
+        # editedItrbl[-1] = editedItrbl[-1][:-1]
+        # # print("G-", editedItrbl)
+        # lkl = ''.join(editedItrbl)
+        # print("here is the editedItrbl: ", lkl, ' Element len: ', len(''.join(''.join(lkl).split('|'))))
+        # return lkl 
 
     def __str__(self) -> str:
         counter = 0
@@ -141,7 +202,9 @@ class BitArray(list[bool]):
     @staticmethod
     def _setBitInByte(byte: int, indx: int) -> int:
         byteBitLen = byte.bit_length()
-        if byteBitLen <= 8:
+        if 0 < indx and indx > 7:
+            raise IndexError('Index :{0} is out of range of the byte index range: 0 - 7'.format(indx))
+        elif byteBitLen <= 8:
             byte |= 1 << (7 - indx)
             return byte
         else:
@@ -186,6 +249,7 @@ class BitArray(list[bool]):
         ----------
         O(1) time and O(1) additional space.
         """
+        # TODO: UPDATE TO CONSIDER WHEN TAIL OFF-BITS != 0
         if indx < self.__len__():
             # Bit is already 0 in the uncommitted tail region. No action needed.
             if indx >= self.__representedBits: return
@@ -206,7 +270,7 @@ class BitArray(list[bool]):
             return 0
 
     @staticmethod
-    def __getByteLastSetBitIndx(lastByte: int) -> int:
+    def _getByteLastSetBitIndx(lastByte: int) -> int:
         '''
         Returns: -1 when byte is 0 ie. no set bit in the byte 
                 but if there is any set bit in the byte, it will return the corresponding index for it. 
@@ -216,135 +280,111 @@ class BitArray(list[bool]):
         elif lastByte > 255:
             raise ValueError('Byte must be within range(0, 256)')
 
-        lastByteStrRpr = bin(lastByte)[2:]
-        lastByteStrRpr = lastByteStrRpr + ((8 - len(lastByteStrRpr)) * '0')
+        # lastByteStrRpr = bin(lastByte)[2:]
+        # lastByteStrRpr = ((8 - len(lastByteStrRpr)) * '0') + lastByteStrRpr 
+        lastByteStrRpr = format(lastByte, '08b') 
         flippedLastByte = lastByteStrRpr[::-1]
 
         for indx, bit in enumerate(flippedLastByte):
-            if bit != '0':
+            if bit == '1':
                 return 7 - indx
         else:
             return 0
+    
 
-    def append(self, isSetBit: bool = True):
-        """
-        Append a single bit to the bit array.
-        This method appends either a set bit (1) or an unset bit (0) to the end of the represented bit sequence,
-        updating internal storage and counters as needed. Bits are packed into a Python bytearray in big-endian
-        order within each byte (the most significant bit of a byte is written first).
-        Behavior:
-        - If isSetBit is False:
-            - The append is treated as an appended unset (0) and the internal unset-tail counter
-              (__unsetTailBitsLen) is incremented. The underlying bytearray may be resized so there
-              is space to represent future bits.
-        - If isSetBit is True:
-            - The method will attempt to materialize the appended set bit (1) into the existing bytes.
-            - If there are pending unset-tail bits, this set bit may cause those unset bits to be flushed
-              into the bytearray together with the new set bit (possibly spanning multiple bytes).
-            - If there is no space in the current last byte, the bytearray is expanded as necessary.
-            - Internal helpers are used to find the last set byte, compute available free bits, set a
-              bit inside a byte, and resize storage.
-        Side effects / mutated attributes:
-        - self.__byteArray: may be resized and/or updated to include the new bit(s).
-        - self.__unsetTailBitsLen: incremented when appending an unset bit; cleared when pending unset bits
-          are materialized due to a subsequent set bit append.
-        - self.__representedBits: incremented whenever bits become part of the represented sequence.
-        - Other internal indices/counters used by helper methods may also change.
-        Parameters:
-        - isSetBit (bool, optional): If True (default), append a set bit (1). If False, append an unset bit (0).
-          The implementation treats truthy/falsy values similarly to bool, but the intended input is a boolean.
-        Return:
-        - None
-        Complexity:
-        - Amortized O(1) per append. A single append may trigger a resize and involve O(n) work where n is the
-          number of bytes, but typical appends are constant-time when no resize is required.
-        Notes / edge cases:
-        - The method assumes internal invariants maintained by helper methods (e.g., __len__(), __resizeSelf(),
-          _availableFreeBitsSpace(), __getLastSetByteIndx(), BitArray._setBitInByte(), and
-          BitArray.__getByteLastSetBitIndx()).
-        - Appending a set bit when there is a non-zero unset-tail will try to pack those unset bits into bytes
-          before or while inserting the set bit; the precise packing follows the class's MSB-first byte convention.
-        - The method does not return a value and should be used for its side effect of extending the bit array.
-        """
-        # is unset
-        if isSetBit == False:
-            # increment the unsetTailBitCounter.
-            self.__unsetTailBitsLen += 1
-            requiredBytesNo = ceil(self.__len__() / 8)
-            # If bytearray cannot accomodate the off-bit in the bytearray, make space for the appended off-bit 
-            if len(self.__byteArray) -  requiredBytesNo < 0:
-                self.__resizeSelf(requiredBytesNo)
-        # is set
-        else:        
-            availableFreeBits = self._availableFreeBitsSpace()
+    def canholdXbytes(self, bytesLen: int)-> bool:
+        if len(self.__byteArray) >= bytesLen:return True
+        else: return False
 
-            # Check if there are free bits to hold the bit to be appended.
-            if availableFreeBits <= 0:  # if not
-                # resize the bytearray to have enough space for the appended bit.
-                self.__resizeSelf(newSize=len(self.__byteArray) + 1)
 
-            lastSetByteIndx = self.__getLastSetByteIndx()
-            # If there is no space in the last set byte to accomodate the appended bit:
-            lastSetByteVal = self.__byteArray[lastSetByteIndx]
-            if self.__byteArray[lastSetByteIndx] == 255:
-                # Move to the next empty byte.
-                lastSetByteIndx += 1
-                lastSetByteVal = self.__byteArray[lastSetByteIndx]
-            lSBitI = BitArray.__getByteLastSetBitIndx(lastByte=lastSetByteVal)
-            lastByteAvailableSpace = 8 - (lSBitI + 1)
+    def append(self, isSetBit: bool=True):
+        # before appending check whether appended bit is an on or off-bit?
+        # If its an on-bit:
+        if IS_DEBUG_MODE: print('Unset tail bits: ', self.__unsetTailBitsLen)
+        if isSetBit:
+            if IS_DEBUG_MODE: print('Is on-bit')
+            # Check whether or not the bytearray can hold the tail unset bits and the last on-bitt?
+            newBitsLen = self.__unsetTailBitsLen + 1
+            byteArrayNewSize: int = (self.__getLastSetByteIndx() + 1) + ceil(newBitsLen / 8)
 
-            # are there unsetbits
-            if self.__unsetTailBitsLen == 0:  # no
-                # append a set bit to the appropriate last byte.
-                lastSetBitInLastByte = BitArray.__getByteLastSetBitIndx(
-                    lastByte=self.__byteArray[lastSetByteIndx])
-                bitToSet = 0 if lastSetByteVal == 0 else lastSetBitInLastByte + 1
-                lastByteWithAppendedBit = BitArray._setBitInByte(byte=lastSetByteVal, indx=bitToSet)
+            # No it can't:
+            if not self.canholdXbytes(byteArrayNewSize):
+                # resize the array to have enough space for both the unset tail bits and the last on-bit.
+                self.__resizeSelf(byteArrayNewSize)
                 
-                self.__byteArray[lastSetByteIndx] = lastByteWithAppendedBit
-                self.__representedBits += 1
-                return
-            else:  # yes
-                # can the last byte hold the all the unset bits and the last set bit
-                if lastByteAvailableSpace >= self.__unsetTailBitsLen + 1:  # yes
-                    _, usedBits =divmod(self.__len__(), 8)
-                    
-                    self.__byteArray[lastSetByteIndx] = BitArray._setBitInByte(byte=lastSetByteVal, indx=usedBits) 
-                    # Clear the unsetTailBitsCounter.
-                    self.__representedBits += (self.__unsetTailBitsLen + 1)
-                    self.__unsetTailBitsLen = 0
-                    return
-                else:  # no
-                    # Find the number of bits which can fit into the last byte
-                    remainingUnsetBits = self.__unsetTailBitsLen - lastByteAvailableSpace
-                    # Find the number of bytes and bits required to further store the full new bit data.
-                    requiredBytes, remainderBits = divmod(remainingUnsetBits, 8)
-                    offsetByteIndx = lastSetByteIndx + requiredBytes
-
-                    # Insert the unset bits to the unset portion of the lastSetByte
-                    self.__byteArray[lastSetByteIndx] =  lastSetByteVal << (8 - lastSetByteVal.bit_length()) #<<-TODO: FIX: something ain't right here.
-
-                    # 2-
-                    # Fill the intermediate bytes with 0s
-                    self.__byteArray[lastSetByteIndx + 1: offsetByteIndx + 1] = [0] * requiredBytes
-
-                    # 3-
-                    # If there are no remaining unset bytes, append the last set bit.
-                    if remainderBits == 0:
-                        self.__byteArray[offsetByteIndx + 1] = 1 << 7
-
-                    # If there are a remaining bits.
-                    elif remainderBits > 0:
-                        # We are shifting right in order to provide padding at the most significant bit portion of the byte.
-                        # Eg. byte = [0] remainder unset bits = 3
-                        # byte |= 1 << (7 - 3)
-                        # byte = [00010000] = [10000]
-                        righShiftNo = 7 - remainderBits
-                        self.__byteArray[offsetByteIndx +1] |= 1 << righShiftNo
-
-                self.__representedBits += (self.__unsetTailBitsLen + 1)
+            # Check whether or not there are tail unset bits.
+            # Yes there are:
+            if self.__unsetTailBitsLen > 0:
+                # get required byte-bit pair.
+                requiredByteIndx, requiredBits = self.__getByteBitPair() 
+                if requiredBits == 8: 
+                    requiredByteIndx += 1
+                    lSByte = self.__byteArray[requiredByteIndx]
+                    requiredBits = 0
+                if IS_DEBUG_MODE: print('returned byte-bit pair: ', requiredByteIndx, requiredBits)
+                
+                # in the requiredByte set the bit at required bits + 1
+                lSBCorrectByte = self._setBitInByte(self.__byteArray[requiredByteIndx], requiredBits)
+                if IS_DEBUG_MODE: print('lSBCorrectByte', bin(lSBCorrectByte)[2:]) 
+                self.__byteArray[requiredByteIndx] = lSBCorrectByte 
                 self.__unsetTailBitsLen = 0
-                return
+
+            # No there aren't:
+            else:
+                if IS_DEBUG_MODE: print('Branch D: ')
+                # Set the [last set bit] + 1 in the [last set byte].
+                lSByteIndx = self.__getLastSetByteIndx()
+                if IS_DEBUG_MODE: print('lSByteIndx:', lSByteIndx) 
+                lSByte = self.__byteArray[lSByteIndx]
+                requiredBits = self._getByteLastSetBitIndx(lSByte) + 1
+                if requiredBits == 8: 
+                    lSByteIndx += 1
+                    lSByte = 0
+                    requiredBits = 0
+                if IS_DEBUG_MODE: print('calculated byte-bit pair: ', lSByteIndx, requiredBits)
+                self.__byteArray[lSByteIndx] = self._setBitInByte(lSByte, requiredBits) 
+
+        # If its an off bit:
+        else:
+            if IS_DEBUG_MODE: print('Is off-bit')
+            # Just increment the counter for the tail unset bits.
+            self.__unsetTailBitsLen += 1
+        
+
+    def __getByteBitPair(self)-> tuple[int, int]:
+        # Find the last set byte
+        lSByteIndx = self.__getLastSetByteIndx()
+        lSByte = self.__byteArray[lSByteIndx]
+        if IS_DEBUG_MODE: print('lSByteIndx: ', lSByteIndx)
+        # Find the free bit-space in the last set byte
+        lSByteSetBitsNo = self._getByteLastSetBitIndx(lSByte)+1
+        if IS_DEBUG_MODE:  print('lSByteSetBitsNo: ', lSByteSetBitsNo)
+        freeBitSpace = 8 - lSByteSetBitsNo 
+        # Subtract the free bit-space from the tail unset bits length.
+        remTailUnsetBits = (self.__unsetTailBitsLen) - freeBitSpace 
+
+        if remTailUnsetBits < 0:
+            requiredBits = lSByteSetBitsNo + self.__unsetTailBitsLen
+            if IS_DEBUG_MODE: print('branch a0: ', lSByteIndx, requiredBits)
+            # Set the required byte-bit pair
+            return (lSByteIndx, requiredBits)
+        elif remTailUnsetBits == 0:
+            if IS_DEBUG_MODE: print('branch a: ', lSByteIndx+1, 0)
+            # Set the required byte-bit pair
+            return (lSByteIndx+1, 0)
+        elif remTailUnsetBits <= 8:
+            # Set the required byte-bit pair
+            if IS_DEBUG_MODE: print('branch b: ', lSByteIndx+1, remTailUnsetBits)
+            return (lSByteIndx + 1, remTailUnsetBits)
+        else:
+            # Find how many bytes you are gonna need for the remaining unset bits length,
+            # that is excluding the bits already subtracted from the last set byte.
+            # Set the required byte-bit pair
+            requiredBytes, requiredBits = divmod(remTailUnsetBits, 8)
+            requiredBytes = requiredBytes + 1 if requiredBits > 0 else requiredBytes  
+            print('branch c: ', requiredBytes, requiredBits)
+            return (requiredBytes, requiredBits+1)
+
 
     def _availableFreeBitsSpace(self) -> int:
         '''Return the number of free **BITS** in the byte array.'''
@@ -376,12 +416,27 @@ class BitArray(list[bool]):
             raise Exception("!!From _availableFreeBitsSpace(): There is a flaw in the free bits checking logic.")
 
 
+    def _byteArrayUnusedBitsNo(self)-> int:
+        bytearrayBitsLen = len(self.__byteArray) * 8 
+        # print(f'!!From free space checker:  bytearray len: {bytearrayBitsLen} representedBits: {self.__representedBits}')
+        return bytearrayBitsLen - self.__representedBits 
+
+
 
     def popBit(self): pass
-
+    
+    def clear(self) -> None:
+        self.__byteArray = bytearray()
+        self.__unsetTailBitsLen = 0
+        self.__representedBits = 0
+        return super().clear()
+    
     def insertBit(self, indx: int): pass
 
     def removeBit(self, indx: int): pass
 
     def extend(self, bits: Iterable[bool]): pass
 
+
+if __name__ == '__main__':
+    pass

@@ -1,34 +1,110 @@
+from bitarray import BitArray
 
-IS_DEBUG = False
 
-def isNaar(n: int)-> bool:
-    nArr: list[str] = list(str(n))
-    if IS_DEBUG: print("n split is: ", nArr)
-    nLen: int = len(nArr)
-    if IS_DEBUG: print("n len: ", nLen)
-    accum: int = 0
+def randomTstBitsCmparatorTst():
+    from random import getrandbits
+    c = 0
+    for itr in range(30):    
+        randBitVal = getrandbits(128)
+        # randBitVal = 27946038368055645232168155774530903583
+        # randBitVal = 227463495832359957314259865785141672904
+        if c == randBitVal: 
+            print(f"Same randBitVals {c} and {randBitVal}")
+            break 
+
+        c = randBitVal
+        x = bin(randBitVal)[2:]
+        formattedString = ''.join(BitArray.intervaledCharInserter(undelinieatedStr=x))
+        print(f"here is formatted string: {formattedString}")
+        # print("Here is curr randBits: ", randBitVal, bin(randBitVal)[2:], '\n', '/'*150)
+        print("Here is curr randBits: ", randBitVal, bin(randBitVal)[2:], '\n', '/'*150)
+        
+        try:
+            singleTstStrCmpratorTest(x)
+        except Exception:
+            print("!!!!!!-----FAILED for test string: ", formattedString)
+            break
+        print("Curr itr is: ", itr)
+    else:print("APPEND METHOD IS GOATED!!!")
+
+
+def singleTstStrCmpratorTest(testBitsString: str = ''):
+    ba = BitArray()
+    testBitsString = '1110001011000101010000100011010100110001100101111000000101101100'
+    tstBitsStrIntervaled = BitArray.intervaledCharInserter(testBitsString)
+    # print(f'Here is rand bit val: {randBitVal} - {x}')
+    fdOStr = BitArray.intervaledCharInserter(undelinieatedStr=testBitsString)
+    for i, b in enumerate(testBitsString, start=1): 
+        print(i)
+        if b == '0': 
+            print('b: ', b)
+            ba.append(isSetBit=False) 
+        elif b == '1': 
+            print('b: ', b)
+            ba.append(isSetBit=True)
+        else: raise Exception(f'Invalid character: {b}')
+        
+        tstChar = testBitsString[i - 1 ]
+        mStrF = ba.__repr__().replace('|', '')[:i]
+        mStr = BitArray.intervaledCharInserter(undelinieatedStr=mStrF)
+        tbStr = testBitsString[:i]
+        fdOStr = BitArray.intervaledCharInserter(undelinieatedStr=tbStr)
+
+        print('O-  ', fdOStr)
+        print('M-  ', mStr)
+
+        print('OF- ', tstBitsStrIntervaled)
+        print('MF- ', ba)
+        
+        print('ouni- ', testBitsString[:i])
+        print('muni- ', mStrF[:i])        
+
+        print('\nCurr Indx: ', i) 
+        print('Length of the bytearray: ', len(ba))
+        if i != len(ba): raise Exception("Length of the ba is inaccurate.")
+        if mStrF[:i] == testBitsString[:i]: print('|/okay till now...')
+        elif tstChar == '1': 
+            print("!!!Semantic error: incorrect appending...")
+            raise Exception()
+
+        # print('M -', m[: i])
+        print('_' * 50)
+    print("HURRAY WORKED FOR TEST BITS: ", testBitsString)
     
-    for digit in nArr:
-        digitToLenPow = int(digit) ** nLen
-        if IS_DEBUG: print(digit, " ** ", nLen, ' = ', digitToLenPow)
-        accum += digitToLenPow
-        if IS_DEBUG: print('Curr accumlator value: ', accum)
+
+if __name__ == '__main__':
+    # singleTstStrCmpratorTest()
+    randomTstBitsCmparatorTst()
+
+
+# def isNaar(n: int)-> bool:
+#     nArr: list[str] = list(str(n))
+#     if IS_DEBUG: print("n split is: ", nArr)
+#     nLen: int = len(nArr)
+#     if IS_DEBUG: print("n len: ", nLen)
+#     accum: int = 0
     
-    isNNarccisit: bool = accum == n
-    if IS_DEBUG: print("Is N narcissit: ", isNNarccisit)
-    return isNNarccisit
+#     for digit in nArr:
+#         digitToLenPow = int(digit) ** nLen
+#         if IS_DEBUG: print(digit, " ** ", nLen, ' = ', digitToLenPow)
+#         accum += digitToLenPow
+#         if IS_DEBUG: print('Curr accumlator value: ', accum)
+    
+#     isNNarccisit: bool = accum == n
+#     if IS_DEBUG: print("Is N narcissit: ", isNNarccisit)
+#     return isNNarccisit
 
 
 
-l: list[bool] = []
-for i in range(10_000):
-    l.append(isNaar(i))
-    if l[-1] == True: 
-        print(i, " : ", 'True')
-        print('-'*50)
+# l: list[bool] = []
+# for i in range(10_000):
+#     l.append(isNaar(i))
+#     if l[-1] == True: 
+#         print(i, " : ", 'True')
+#         print('-'*50)
 
-print("All is Nar: ", all(l))
-print("Any is Nar: ", any(l))
+# print("All is Nar: ", all(l))
+# print("Any is Nar: ", any(l))
 
 
 
